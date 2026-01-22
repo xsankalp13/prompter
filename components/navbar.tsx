@@ -45,7 +45,7 @@ export function Navbar({ user }: NavbarProps) {
                         <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground transition-transform group-hover:scale-105">
                             <Sparkles className="h-4 w-4" />
                         </div>
-                        <span className="text-sm font-semibold tracking-tight text-foreground/90">PromptVault</span>
+                        <span className="text-sm font-semibold tracking-tight text-foreground/90">Prompter</span>
                     </Link>
 
                     {/* Desktop Navigation */}
