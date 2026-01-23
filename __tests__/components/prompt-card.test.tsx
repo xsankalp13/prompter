@@ -1,23 +1,11 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PromptCard } from '@/components/prompt-card'
-
-// Mock next/navigation
-const mockPush = jest.fn()
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-}))
+import { createMockPrompt } from '../utils/factories'
+import { useRouter } from 'next/navigation'
 
 // Mock actions/prompts
 jest.mock('@/actions/prompts', () => ({
   deletePrompt: jest.fn(),
-}))
-
-// Mock sonner
-jest.mock('sonner', () => ({
-  toast: {
-    success: jest.fn(),
-    error: jest.fn(),
-  },
 }))
 
 // Mock VoteButtons
@@ -26,26 +14,14 @@ jest.mock('@/components/vote-buttons', () => ({
 }))
 
 describe('PromptCard', () => {
-  const mockPrompt = {
-    id: '1',
-    title: 'Test Prompt',
-    content: 'This is a test prompt content',
-    category: 'Coding',
-    user_id: 'user1',
-    is_favorite: false,
-    favorite_count: 0,
-    created_at: '2023-01-01',
-    profiles: {
-      display_name: 'Test Author',
-      email: 'author@example.com',
-    },
-    tags: ['react', 'testing'],
-    vote_count: 10,
-    user_vote: 1,
-  }
+  const mockPrompt = createMockPrompt()
+  const mockPush = jest.fn()
 
   beforeEach(() => {
     jest.clearAllMocks()
+    ;(useRouter as jest.Mock).mockReturnValue({
+      push: mockPush,
+    })
   })
 
   it('renders prompt details', () => {
@@ -62,6 +38,6 @@ describe('PromptCard', () => {
     render(<PromptCard prompt={mockPrompt} />)
 
     fireEvent.click(screen.getByText('Test Prompt'))
-    expect(mockPush).toHaveBeenCalledWith('/prompt/1')
+    expect(mockPush).toHaveBeenCalledWith(`/prompt/${mockPrompt.id}`)
   })
 })

@@ -1,11 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { Navbar } from '@/components/navbar'
-
-// Mock next/navigation
-jest.mock('next/navigation', () => ({
-  usePathname: jest.fn(() => '/'),
-  useRouter: jest.fn(() => ({ push: jest.fn() })),
-}))
+import { createMockUser } from '../utils/factories'
 
 // Mock actions/auth
 jest.mock('@/actions/auth', () => ({
@@ -28,13 +23,7 @@ describe('Navbar', () => {
   })
 
   it('renders user avatar and dashboard link when user is logged in', () => {
-    const user = {
-      id: '123',
-      email: 'test@example.com',
-      display_name: 'Test User',
-      role: 'user',
-      created_at: '2023-01-01',
-    } as any
+    const user = createMockUser()
 
     render(<Navbar user={user} />)
 
