@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X, Loader2 } from 'lucide-react'
 import { useInView } from 'react-intersection-observer'
@@ -10,76 +11,59 @@ import { CategoryFilter } from '@/components/category-filter'
 import { Navbar } from '@/components/navbar'
 import { getPrompts, getCategories } from '@/actions/prompts'
 import { getUserProfile } from '@/actions/auth'
-import type { PromptWithCreator, Profile } from '@/types/database'
 import { Toaster } from '@/components/ui/sonner'
 
 export default function FeedPage() {
-    const [prompts, setPrompts] = useState<PromptWithCreator[]>([])
-    const [categories, setCategories] = useState<string[]>([])
     const [selectedCategory, setSelectedCategory] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
-    const [page, setPage] = useState(1)
-    const [hasMore, setHasMore] = useState(true)
-    const [user, setUser] = useState<Profile | null>(null)
-    const [isPending, startTransition] = useTransition()
-    const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+    const { data: user } = useQuery({
+        queryKey: ['user-profile'],
+        queryFn: async () => await getUserProfile(),
+    })
+
+    const { data: categories = [] } = useQuery({
+        queryKey: ['categories'],
+        queryFn: async () => await getCategories(),
+    })
+
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        status,
+    } = useInfiniteQuery({
+        queryKey: ['prompts', selectedCategory, searchQuery],
+        queryFn: async ({ pageParam = 1 }) => {
+            const { prompts, hasMore } = await getPrompts(
+                pageParam as number,
+                selectedCategory !== 'all' ? selectedCategory : undefined,
+                searchQuery || undefined
+            )
+            return { prompts, hasMore, nextPage: hasMore ? (pageParam as number) + 1 : undefined }
+        },
+        initialPageParam: 1,
+        getNextPageParam: (lastPage) => lastPage.nextPage,
+    })
+
+    const prompts = data?.pages.flatMap(page => page.prompts) || []
+    const isPending = status === 'pending'
 
     const { ref, inView } = useInView({
         threshold: 0,
         rootMargin: '100px',
     })
 
-    // Initial load
     useEffect(() => {
-        startTransition(async () => {
-            const [userProfile, categoriesData] = await Promise.all([
-                getUserProfile(),
-                getCategories(),
-            ])
-            setUser(userProfile)
-            setCategories(categoriesData)
-        })
-    }, [])
-
-    // Fetch prompts on filter change
-    useEffect(() => {
-        setPage(1)
-        setPrompts([])
-        setHasMore(true)
-
-        startTransition(async () => {
-            const { prompts: newPrompts, hasMore: more } = await getPrompts(
-                1,
-                selectedCategory !== 'all' ? selectedCategory : undefined,
-                searchQuery || undefined
-            )
-            setPrompts(newPrompts)
-            setHasMore(more)
-        })
-    }, [selectedCategory, searchQuery])
-
-    // Load more on scroll
-    useEffect(() => {
-        if (inView && hasMore && !isPending && !isLoadingMore) {
-            setIsLoadingMore(true)
-            const nextPage = page + 1
-
-            getPrompts(
-                nextPage,
-                selectedCategory !== 'all' ? selectedCategory : undefined,
-                searchQuery || undefined
-            ).then(({ prompts: newPrompts, hasMore: more }) => {
-                setPrompts(prev => [...prev, ...newPrompts])
-                setHasMore(more)
-                setPage(nextPage)
-                setIsLoadingMore(false)
-            })
+        if (inView && hasNextPage) {
+            fetchNextPage()
         }
-    }, [inView, hasMore, isPending, isLoadingMore, page, selectedCategory, searchQuery])
+    }, [inView, hasNextPage, fetchNextPage])
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <Navbar user={user} />
+            <Navbar user={user ?? null} />
 
             <main className="relative pt-24 pb-16">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -132,7 +116,7 @@ export default function FeedPage() {
                         <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-border rounded-sm bg-muted/10">
                             <h3 className="mb-2 text-sm font-medium text-foreground">No prompts found</h3>
                             <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                                We couldn't find anything matching your criteria. Try adjusting your filters.
+                                We couldn&apos;t find anything matching your criteria. Try adjusting your filters.
                             </p>
                         </div>
                     ) : (
@@ -154,7 +138,7 @@ export default function FeedPage() {
 
                             {/* Infinite scroll trigger */}
                             <div ref={ref} className="mt-12 flex justify-center">
-                                {isLoadingMore && (
+                                {isFetchingNextPage && (
                                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                                 )}
                             </div>
