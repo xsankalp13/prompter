@@ -35,7 +35,7 @@ export async function createPrompt(data: PromptFormData) {
         // Upsert tags (insert if not exists)
         for (const tagName of data.tags) {
             // Try to get existing tag or create new one
-            let { data: existingTag } = await supabase
+            const { data: existingTag } = await supabase
                 .from('tags')
                 .select('id')
                 .eq('name', tagName.toLowerCase())

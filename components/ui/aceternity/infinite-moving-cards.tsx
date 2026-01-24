@@ -48,6 +48,7 @@ export function InfiniteMovingCards({
                     scrollerRef.current.appendChild(duplicatedItem)
                 }
             })
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setStart(true)
         }
     }, [])
