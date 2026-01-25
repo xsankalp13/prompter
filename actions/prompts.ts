@@ -283,26 +283,24 @@ export async function getUserPrompts(
         return []
     }
 
-    // Attach profiles to prompts
-    let promptsWithProfiles = await attachProfilesToPrompts(supabase, prompts as Prompt[])
+    const [promptsWithProfiles, promptsWithTags, votesResult] = await Promise.all([
+        attachProfilesToPrompts(supabase, prompts as Prompt[]),
+        attachTagsToPrompts(supabase, prompts as unknown as PromptWithCreator[]),
+        supabase
+            .from('votes')
+            .select('prompt_id, vote_type')
+            .eq('user_id', user.id),
+    ])
 
-    // Get user votes
-    const { data: votes } = await supabase
-        .from('votes')
-        .select('prompt_id, vote_type')
-        .eq('user_id', user.id)
+    const { data: votes } = votesResult
+    const voteMap = new Map((votes || []).map((v) => [v.prompt_id, v.vote_type]))
 
-    const voteMap = new Map((votes || []).map(v => [v.prompt_id, v.vote_type]))
-
-    promptsWithProfiles = promptsWithProfiles.map(p => ({
+    // Merge results
+    return promptsWithProfiles.map((p, i) => ({
         ...p,
+        tags: promptsWithTags[i].tags,
         user_vote: voteMap.get(p.id) || null,
     }))
-
-    // Attach tags to prompts
-    promptsWithProfiles = await attachTagsToPrompts(supabase, promptsWithProfiles)
-
-    return promptsWithProfiles
 }
 
 export async function getPromptById(id: string): Promise<PromptWithCreator | null> {
