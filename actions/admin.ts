@@ -98,21 +98,13 @@ export async function getPromptStats() {
         .order('created_at', { ascending: false })
         .limit(5)
 
-    const { data: topCategories } = await supabase
-        .from('prompts')
-        .select('category')
+    const { data: categoryStats } = await supabase
+        .rpc('get_category_stats')
 
-    // Count categories
-    const categoryCounts: Record<string, number> = {}
-    const categories = topCategories as { category: string }[] | null
-    categories?.forEach(p => {
-        categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1
-    })
-
-    const sortedCategories = Object.entries(categoryCounts)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5)
-        .map(([name, count]) => ({ name, count }))
+    const sortedCategories = categoryStats?.map(stat => ({
+        name: stat.category,
+        count: stat.count
+    })) || []
 
     return {
         totalPrompts: totalPrompts || 0,

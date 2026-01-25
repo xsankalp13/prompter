@@ -170,6 +170,12 @@ export interface Database {
                 }
             }
         }
+        Functions: {
+            get_category_stats: {
+                Args: Record<string, never>
+                Returns: { category: string; count: number }[]
+            }
+        }
     }
 }
 
