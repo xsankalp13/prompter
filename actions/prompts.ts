@@ -247,9 +247,12 @@ export async function getPrompts(
     // Attach tags to prompts
     promptsWithProfiles = await attachTagsToPrompts(supabase, promptsWithProfiles)
 
+    const hasMore = prompts.length > PROMPTS_PER_PAGE
+    const paginatedPrompts = hasMore ? promptsWithProfiles.slice(0, PROMPTS_PER_PAGE) : promptsWithProfiles
+
     return {
-        prompts: promptsWithProfiles,
-        hasMore: prompts.length > PROMPTS_PER_PAGE,
+        prompts: paginatedPrompts,
+        hasMore,
     }
 }
 
