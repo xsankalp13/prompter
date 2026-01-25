@@ -197,3 +197,13 @@
     scroll-behavior: smooth;
   }
 }
+@layer utilities {
+  .animate-scroll {
+    animation: scroll var(--animation-duration) linear infinite;
+  }
+  @keyframes scroll {
+    to {
+      transform: translate(var(--scroll-distance));
+    }
+  }
+}

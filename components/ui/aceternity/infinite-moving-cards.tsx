@@ -1,7 +1,6 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { motion, useAnimationFrame } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 
 export function InfiniteMovingCards({
@@ -24,49 +23,51 @@ export function InfiniteMovingCards({
     const containerRef = useRef<HTMLDivElement>(null)
     const scrollerRef = useRef<HTMLUListElement>(null)
     const [start, setStart] = useState(false)
-    const [scrollPosition, setScrollPosition] = useState(0)
-
-    const getSpeed = () => {
-        switch (speed) {
-            case 'fast':
-                return 1
-            case 'normal':
-                return 0.5
-            case 'slow':
-                return 0.25
-            default:
-                return 0.5
-        }
-    }
 
     useEffect(() => {
-        if (scrollerRef.current) {
-            const scrollerContent = Array.from(scrollerRef.current.children)
+        const scroller = scrollerRef.current
+        if (!scroller) return
+
+        // Duplication logic
+        if (scroller.getAttribute('data-duplicated') !== 'true') {
+            const scrollerWidth = scroller.scrollWidth
+            const gap = parseInt(window.getComputedStyle(scroller).gap || '0')
+            const scrollDistance = scrollerWidth + gap
+
+            const scrollerContent = Array.from(scroller.children)
             scrollerContent.forEach((item) => {
                 const duplicatedItem = item.cloneNode(true)
-                if (scrollerRef.current) {
-                    scrollerRef.current.appendChild(duplicatedItem)
-                }
+                scroller.appendChild(duplicatedItem)
             })
+
+            scroller.setAttribute('data-duplicated', 'true')
+            scroller.style.setProperty('--scroll-distance', `-${scrollDistance}px`)
+        }
+
+        // Animation logic
+        const getSpeedInPx = () => {
+            switch (speed) {
+                case 'fast':
+                    return 50
+                case 'normal':
+                    return 30
+                case 'slow':
+                    return 15
+                default:
+                    return 30
+            }
+        }
+
+        const styleDistance = scroller.style.getPropertyValue('--scroll-distance')
+        const distance = Math.abs(parseFloat(styleDistance))
+
+        if (distance) {
+            const duration = distance / getSpeedInPx()
+            scroller.style.setProperty('--animation-duration', `${duration}s`)
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setStart(true)
         }
-    }, [])
-
-    useAnimationFrame(() => {
-        if (!scrollerRef.current || !start) return
-
-        const scrollerWidth = scrollerRef.current.scrollWidth / 2
-        const newPosition = direction === 'left'
-            ? scrollPosition + getSpeed()
-            : scrollPosition - getSpeed()
-
-        if (Math.abs(newPosition) >= scrollerWidth) {
-            setScrollPosition(0)
-        } else {
-            setScrollPosition(newPosition)
-        }
-    })
+    }, [direction, speed])
 
     return (
         <div
@@ -80,10 +81,11 @@ export function InfiniteMovingCards({
                 ref={scrollerRef}
                 className={cn(
                     'flex w-max min-w-full shrink-0 flex-nowrap gap-4 py-4',
+                    start && 'animate-scroll',
                     pauseOnHover && 'hover:[animation-play-state:paused]'
                 )}
                 style={{
-                    transform: `translateX(-${scrollPosition}px)`,
+                    animationDirection: direction === 'right' ? 'reverse' : 'normal',
                 }}
             >
                 {items.map((item, idx) => (
