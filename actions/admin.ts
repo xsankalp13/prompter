@@ -101,7 +101,7 @@ export async function getPromptStats() {
     const { data: categoryStats } = await supabase
         .rpc('get_category_stats')
 
-    const sortedCategories = categoryStats?.map(stat => ({
+    const sortedCategories = categoryStats?.map((stat: { category: string; count: number }) => ({
         name: stat.category,
         count: stat.count
     })) || []
