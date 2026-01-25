@@ -84,29 +84,33 @@ export async function getPromptStats() {
         return null
     }
 
-    const { count: totalPrompts } = await supabase
-        .from('prompts')
-        .select('*', { count: 'exact', head: true })
+    const [
+        { count: totalPrompts },
+        { count: totalUsers },
+        { data: recentPrompts },
+        { data: topCategories },
+    ] = await Promise.all([
+        supabase.from('prompts').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase
+            .from('prompts')
+            .select('id, title, created_at')
+            .order('created_at', { ascending: false })
+            .limit(5),
+        supabase.from('prompts').select('category'),
+    ])
 
-    const { count: totalUsers } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
+    // Count categories
+    const categoryCounts: Record<string, number> = {}
+    const categories = topCategories as { category: string }[] | null
+    categories?.forEach(p => {
+        categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1
+    })
 
-    const { data: recentPrompts } = await supabase
-        .from('prompts')
-        .select('id, title, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-    const { data: topCategories, error: categoriesError } = await supabase
-        .rpc('get_category_stats')
-
-    if (categoriesError) {
-        console.error('Error fetching category stats:', categoriesError)
-    }
-
-    const sortedCategories = (topCategories as unknown as { category: string, count: number }[] | null)
-        ?.map(c => ({ name: c.category, count: c.count })) || []
+    const sortedCategories = Object.entries(categoryCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([name, count]) => ({ name, count }))
 
     return {
         totalPrompts: totalPrompts || 0,

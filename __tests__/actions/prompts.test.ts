@@ -24,10 +24,6 @@ describe('deletePrompt action', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    // Default successful response
-    mockDelete.mockReturnValue({ error: null })
-    mockEq.mockReturnValue({ delete: mockDelete, eq: mockEq }) // Handling chaining
-    mockFrom.mockReturnValue({ delete: mockDelete, eq: mockEq }) // Incorrect chaining, let's fix
 
     // Correct Supabase query chain: supabase.from().delete().eq()
     // OR supabase.from().delete().match() etc.

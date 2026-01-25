@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { PromptFormData, PromptWithCreator, Prompt } from '@/types/database'
+import type { PromptFormData, PromptWithCreator, Prompt, Vote } from '@/types/database'
 
 const PROMPTS_PER_PAGE = 12
 
@@ -226,30 +226,47 @@ export async function getPrompts(
         return { prompts: [], hasMore: false }
     }
 
-    // Attach profiles to prompts
-    let promptsWithProfiles = await attachProfilesToPrompts(supabase, prompts as Prompt[])
+    const promptsArray = prompts as Prompt[]
+    const hasMore = promptsArray.length > PROMPTS_PER_PAGE
+    const promptsToProcess = hasMore ? promptsArray.slice(0, PROMPTS_PER_PAGE) : promptsArray
 
-    // Check user votes for each prompt
-    if (user && prompts.length > 0) {
-        const { data: votes } = await supabase
-            .from('votes')
-            .select('prompt_id, vote_type')
-            .eq('user_id', user.id)
-            .in('prompt_id', prompts.map(p => p.id))
+    if (promptsToProcess.length === 0) {
+        return { prompts: [], hasMore: false }
+    }
 
-        const voteMap = new Map((votes || []).map(v => [v.prompt_id, v.vote_type]))
-        promptsWithProfiles = promptsWithProfiles.map(p => ({
+    const [promptsWithProfiles, votesResult, promptsWithTags] = await Promise.all([
+        attachProfilesToPrompts(supabase, promptsToProcess),
+        (user)
+            ? supabase
+                .from('votes')
+                .select('prompt_id, vote_type')
+                .eq('user_id', user.id)
+                .in('prompt_id', promptsToProcess.map(p => p.id))
+            : Promise.resolve({ data: [] }),
+        attachTagsToPrompts(supabase, promptsToProcess as unknown as PromptWithCreator[])
+    ])
+
+    // Merge results
+    let finalPrompts = promptsWithProfiles
+
+    // Merge votes
+    if (votesResult.data && votesResult.data.length > 0) {
+        const voteMap = new Map((votesResult.data as Pick<Vote, 'prompt_id' | 'vote_type'>[]).map(v => [v.prompt_id, v.vote_type]))
+        finalPrompts = finalPrompts.map(p => ({
             ...p,
             user_vote: voteMap.get(p.id) || null,
         }))
     }
 
-    // Attach tags to prompts
-    promptsWithProfiles = await attachTagsToPrompts(supabase, promptsWithProfiles)
+    // Merge tags
+    finalPrompts = finalPrompts.map((p, i) => ({
+        ...p,
+        tags: promptsWithTags[i].tags
+    }))
 
     return {
-        prompts: promptsWithProfiles,
-        hasMore: prompts.length > PROMPTS_PER_PAGE,
+        prompts: finalPrompts,
+        hasMore,
     }
 }
 
@@ -283,26 +300,24 @@ export async function getUserPrompts(
         return []
     }
 
-    // Attach profiles to prompts
-    let promptsWithProfiles = await attachProfilesToPrompts(supabase, prompts as Prompt[])
+    const [promptsWithProfiles, promptsWithTags, votesResult] = await Promise.all([
+        attachProfilesToPrompts(supabase, prompts as Prompt[]),
+        attachTagsToPrompts(supabase, prompts as unknown as PromptWithCreator[]),
+        supabase
+            .from('votes')
+            .select('prompt_id, vote_type')
+            .eq('user_id', user.id),
+    ])
 
-    // Get user votes
-    const { data: votes } = await supabase
-        .from('votes')
-        .select('prompt_id, vote_type')
-        .eq('user_id', user.id)
+    const { data: votes } = votesResult
+    const voteMap = new Map((votes || []).map((v) => [v.prompt_id, v.vote_type]))
 
-    const voteMap = new Map((votes || []).map(v => [v.prompt_id, v.vote_type]))
-
-    promptsWithProfiles = promptsWithProfiles.map(p => ({
+    // Merge results
+    return promptsWithProfiles.map((p, i) => ({
         ...p,
+        tags: promptsWithTags[i].tags,
         user_vote: voteMap.get(p.id) || null,
     }))
-
-    // Attach tags to prompts
-    promptsWithProfiles = await attachTagsToPrompts(supabase, promptsWithProfiles)
-
-    return promptsWithProfiles
 }
 
 export async function getPromptById(id: string): Promise<PromptWithCreator | null> {
