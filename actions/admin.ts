@@ -84,23 +84,21 @@ export async function getPromptStats() {
         return null
     }
 
-    const { count: totalPrompts } = await supabase
-        .from('prompts')
-        .select('*', { count: 'exact', head: true })
-
-    const { count: totalUsers } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-
-    const { data: recentPrompts } = await supabase
-        .from('prompts')
-        .select('id, title, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-    const { data: topCategories } = await supabase
-        .from('prompts')
-        .select('category')
+    const [
+        { count: totalPrompts },
+        { count: totalUsers },
+        { data: recentPrompts },
+        { data: topCategories },
+    ] = await Promise.all([
+        supabase.from('prompts').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase
+            .from('prompts')
+            .select('id, title, created_at')
+            .order('created_at', { ascending: false })
+            .limit(5),
+        supabase.from('prompts').select('category'),
+    ])
 
     // Count categories
     const categoryCounts: Record<string, number> = {}
